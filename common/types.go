@@ -1,6 +1,8 @@
 package common
 
 import (
+	"math/big"
+
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -102,4 +104,68 @@ type Transaction struct {
 	V                string `json:"v"`
 	R                string `json:"r"`
 	S                string `json:"s"`
+}
+
+func hexToDecimal(s string) bson.Decimal128 {
+	bigInt := new(big.Int)
+	bigInt.SetString(s, 0)
+	bigIntByte, _ := bigInt.MarshalText()
+	decimal, _ := bson.ParseDecimal128(string(bigIntByte))
+	return decimal
+	// return bigInt.Int64()
+}
+
+func converToMTransaction(txs []Transaction) []MTransaction {
+	var mts []MTransaction
+
+	for _, t := range txs {
+		var mt MTransaction
+
+		mt.BlockHash = t.BlockHash
+		mt.BlockNumber = hexToDecimal(t.BlockNumber)
+		mt.From = t.From
+		mt.Gas = hexToDecimal(t.Gas)
+		mt.GasPrice = hexToDecimal(t.GasPrice)
+		mt.Hash = t.Hash
+		mt.Input = t.Input
+		mt.Nonce = t.Nonce
+		mt.R = t.R
+		mt.S = t.S
+		mt.To = t.To
+		mt.TransactionIndex = hexToDecimal(t.TransactionIndex)
+		mt.V = t.V
+		mt.Value = hexToDecimal(t.Value)
+
+		mts = append(mts, mt)
+	}
+
+	return mts
+}
+
+// ToMBlock 转为为mongodb需要的bson格式
+func (r *Block) ToMBlock() *MBlock {
+	var m = MBlock{}
+	// var err error
+	m.Bloom = r.Bloom
+	m.Coinbase = r.Coinbase
+	m.Difficulty = hexToDecimal(r.Difficulty)
+	m.Extra = r.Extra
+	m.GasLimit = hexToDecimal(r.GasLimit)
+	m.GasUsed = hexToDecimal(r.GasUsed)
+	m.Hash = r.Hash
+	m.MixDigest = r.MixDigest
+	m.Nonce = r.Nonce
+	m.Number = hexToDecimal(r.Number)
+	m.ParentHash = r.ParentHash
+	m.ReceiptHash = r.ReceiptHash
+	m.Root = r.Root
+	m.Size = hexToDecimal(r.Size)
+	m.Time = hexToDecimal(r.Time)
+	m.TotalDifficulty = hexToDecimal(r.TotalDifficulty)
+	m.TxHash = r.TxHash
+	m.TXs = converToMTransaction(r.TXs)
+	m.UncleHash = r.UncleHash
+	m.Uncles = r.Uncles
+
+	return &m
 }
