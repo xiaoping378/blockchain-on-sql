@@ -1,6 +1,12 @@
 package sql
 
 import (
+	"fmt"
+	"log"
+	"strconv"
+
+	"github.com/xiaoping378/blockchain-on-sql/common"
+	"github.com/xiaoping378/blockchain-on-sql/parser"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -8,7 +14,7 @@ import (
 var server = "127.0.0.1:27017"
 
 type SQL struct {
-	session mgo.Session
+	C *mgo.Collection
 }
 
 // func (s *SQL) Connect(addr string) error {
@@ -20,10 +26,14 @@ type SQL struct {
 // 	session.SetMode(mgo.Monotonic, true)
 // }
 
+func (s *SQL) SetCollection(c *mgo.Collection) *SQL {
+	s.C = c
+	return s
+}
+
 // InsertOne mongo full-block with tx details
 func (s *SQL) InsertOne(block interface{}) error {
-	c := s.session.DB("Eth").C("Block")
-	if err := c.Insert(block); err != nil {
+	if err := s.C.Insert(block); err != nil {
 		return err
 	}
 	return nil
@@ -32,11 +42,36 @@ func (s *SQL) InsertOne(block interface{}) error {
 
 func (s *SQL) GetSyncedBlockCount() uint64 {
 
-	result := struct {
-		number uint64
-	}{}
+	result := common.MBlock{}
+	s.C.Find(bson.M{}).Sort("-number").Limit(1).One(&result)
+	syncedNumber, _ := strconv.ParseUint(result.Number.String(), 10, 64)
+	return syncedNumber
+}
 
-	c := s.session.DB("Eth").C("Block")
-	c.Find(bson.M{}).Sort("-number").Limit(1).One(&result)
-	return result.number
+func (s *SQL) Sync(syncedNumber, latestBlock uint64, c chan int) {
+	block := common.Block{}
+	if syncedNumber > 0 {
+		// 从下一个块开始同步
+		syncedNumber++
+	}
+	for i := syncedNumber; i <= latestBlock; i++ {
+
+		number := fmt.Sprintf("0x%s", strconv.FormatUint(uint64(i), 16))
+		resp, err := parser.Call("eth_getBlockByNumber", []interface{}{number, true})
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if err := parser.MapToObject(resp.Result, &block); err != nil {
+			log.Fatalln(err)
+		}
+
+		mBlock := block.ToMBlock()
+
+		if err := s.InsertOne(mBlock); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	c <- 1
 }
