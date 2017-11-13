@@ -31,7 +31,7 @@ func main() {
 		select {
 		case <-sync:
 			log.Println("syncing task is completed.")
-			time.Sleep(7 * time.Second)
+			time.Sleep(7 * time.Second) // TODO: using event listen
 			s.Sync(s.GetSyncedBlockCount(), parser.GetLatestBlockNumber(), sync)
 		}
 	}

@@ -1,2 +1,3 @@
 package: github.com/xiaoping378/blockchain-on-sql
-import: []
+import:
+- package: gopkg.in/mgo.v2
